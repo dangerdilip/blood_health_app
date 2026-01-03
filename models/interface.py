@@ -35,10 +35,10 @@ def _load_cox_model():
     try:
         with open(model_path, "rb") as f:
             _COX_MODEL = pickle.load(f)
+
         logger.info("✅ Cox model loaded successfully")
-         # ✅ NEW LOG LINE
-    logger.info(f"Cox model type: {type(_COX_MODEL)}")
-    
+        logger.info(f"Cox model type: {type(_COX_MODEL)}")
+
     except Exception as e:
         logger.exception("❌ Failed to load Cox model")
         raise RuntimeError("Cox model load failed") from e
@@ -71,29 +71,21 @@ def predict_risk(features_df: pd.DataFrame) -> float:
         return 0.0
 
     try:
-        # Predict survival function
         surv_df = _COX_MODEL.predict_survival_function(X)
 
-        # Handle DataFrame output
         if isinstance(surv_df, pd.DataFrame):
             surv_series = surv_df.iloc[:, 0]
         else:
             surv_series = surv_df
 
-        # Survival at ~90 days (fallback to last available)
         if 90 in surv_series.index:
             survival_prob = float(surv_series.loc[90])
         else:
             survival_prob = float(surv_series.iloc[-1])
 
-        # Risk = 1 - survival
         risk_score = 1.0 - survival_prob
+        return max(0.0, min(float(risk_score), 1.0))
 
-        # Clamp strictly
-        risk_score = max(0.0, min(float(risk_score), 1.0))
-
-        return risk_score
-
-    except Exception as e:
+    except Exception:
         logger.exception("❌ Cox inference failed — returning safe fallback")
         return 0.0
