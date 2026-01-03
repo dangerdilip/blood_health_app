@@ -36,6 +36,9 @@ def _load_cox_model():
         with open(model_path, "rb") as f:
             _COX_MODEL = pickle.load(f)
         logger.info("✅ Cox model loaded successfully")
+         # ✅ NEW LOG LINE
+    logger.info(f"Cox model type: {type(_COX_MODEL)}")
+    
     except Exception as e:
         logger.exception("❌ Failed to load Cox model")
         raise RuntimeError("Cox model load failed") from e
