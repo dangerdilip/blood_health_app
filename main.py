@@ -11,15 +11,21 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 
+logger = logging.getLogger(__name__)
+
 # ---------------- FASTAPI APP ----------------
-app = FastAPI(title="Blood Health Risk API")
+app = FastAPI(
+    title="Blood Health Risk API",
+    version="1.0.0"
+)
 
 # ---------------- CORS ----------------
-# (Frontend domain can be restricted later)
+# Allow all for now; restrict after frontend deployment
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["POST", "GET"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -40,16 +46,40 @@ class PatientCBCRequest(BaseModel):
     records: list[CBCRecord]
 
 
-# ---------------- ENDPOINTS ----------------
-@app.post("/risk/predict")
-def predict_risk(payload: PatientCBCRequest):
-    result = calculate_risk(payload.records)
+# ---------------- ROOT / HEALTH ----------------
+@app.get("/")
+def root():
+    """
+    Render + browser health check.
+    Prevents confusing 404 logs.
+    """
     return {
-        "patient_id": payload.patient_id,
-        **result
+        "status": "ok",
+        "service": "blood-health-backend",
+        "message": "API is running"
     }
 
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+# ---------------- MAIN API ----------------
+@app.post("/risk/predict")
+def predict_risk(payload: PatientCBCRequest):
+    """
+    Main risk prediction endpoint.
+    ML model is lazy-loaded inside service layer.
+    """
+    logger.info(
+        f"Received risk request for patient_id={payload.patient_id}, "
+        f"records={len(payload.records)}"
+    )
+
+    result = calculate_risk(payload.records)
+
+    return {
+        "patient_id": payload.patient_id,
+        **result
+    }
