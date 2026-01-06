@@ -5,7 +5,14 @@ from models.interface import predict_risk
 
 logger = logging.getLogger(__name__)
 
-def calculate_risk(cbc_records: list) -> dict:
+def calculate_risk(cbc_records: list, alerts: list | None = None) -> dict:
+    """
+    Core clinical risk evaluation logic.
+    - alerts: extreme-value alerts injected from API layer
+    """
+
+    alerts = alerts or []
+
     # ---------- INPUT TO DATAFRAME ----------
     df = pd.DataFrame([r.model_dump() for r in cbc_records])
 
@@ -23,17 +30,29 @@ def calculate_risk(cbc_records: list) -> dict:
     if stats["abnormal_z_count"] >= 2:
         flags.append("Multiple abnormal CBC markers detected")
 
-    # ---------- BLOOD STATUS (FIXED) ----------
-    blood_status = (
-        "Abnormal but stable" if flags else "Clinically stable"
-    )
+    has_extreme_alerts = len(alerts) > 0
+
+    # ---------- BLOOD STATUS (FIXED & MEDICALLY CORRECT) ----------
+    if has_extreme_alerts:
+        blood_status = "Critical abnormalities detected"
+    elif flags:
+        blood_status = "Abnormal but stable"
+    else:
+        blood_status = "Clinically stable"
 
     # ---------- SINGLE CBC (NO ML) ----------
     if features is None:
+        recommendation = (
+            "Extreme or clinically dangerous values detected. "
+            "Please consult a doctor immediately."
+            if has_extreme_alerts
+            else "Periodic monitoring advised"
+        )
+
         return {
             "blood_status": blood_status,
             "future_risk": "Insufficient data for trend-based prediction",
-            "recommendation": "Periodic monitoring advised",
+            "recommendation": recommendation,
             "flags": flags
         }
 
@@ -42,10 +61,18 @@ def calculate_risk(cbc_records: list) -> dict:
         risk_score = float(predict_risk(features))
     except Exception as e:
         logger.error(f"Cox model inference failed: {e}")
+
+        recommendation = (
+            "Extreme or clinically dangerous values detected. "
+            "Please consult a doctor immediately."
+            if has_extreme_alerts
+            else "Periodic monitoring advised"
+        )
+
         return {
             "blood_status": blood_status,
             "future_risk": "Risk model unavailable; rule-based assessment applied",
-            "recommendation": "Periodic monitoring advised",
+            "recommendation": recommendation,
             "flags": flags + ["ML risk model unavailable"]
         }
 
@@ -57,19 +84,16 @@ def calculate_risk(cbc_records: list) -> dict:
     else:
         future_risk = "High probability of deterioration in the next 30–60 days"
 
-    recommendation = (
-        "Immediate clinical follow-up advised"
-        if risk_score >= 0.3
-        else "Periodic monitoring advised"
-    )
-
-    # ---------- SAFE OVERRIDE (DOES NOT REMOVE LOGIC) ----------
-    if flags:
-        blood_status = "Critical abnormalities detected"
+    # ---------- RECOMMENDATION ----------
+    if has_extreme_alerts:
         recommendation = (
             "Extreme or clinically dangerous values detected. "
             "Please consult a doctor immediately, even if symptoms are mild."
         )
+    elif risk_score >= 0.3:
+        recommendation = "Immediate clinical follow-up advised"
+    else:
+        recommendation = "Periodic monitoring advised"
 
     return {
         "blood_status": blood_status,
