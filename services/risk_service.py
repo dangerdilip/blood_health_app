@@ -49,7 +49,7 @@ def calculate_risk(cbc_records: list) -> dict:
             "flags": flags + ["ML risk model unavailable"]
         }
 
-    # ---------- RISK INTERPRETATION ----------
+        # ---------- RISK INTERPRETATION ----------
     if risk_score < 0.15:
         future_risk = "Low probability of further deterioration in the next 30–60 days"
     elif risk_score < 0.30:
@@ -62,6 +62,14 @@ def calculate_risk(cbc_records: list) -> dict:
         if risk_score >= 0.3
         else "Periodic monitoring advised"
     )
+
+    # ---------- SAFE OVERRIDE (DOES NOT REMOVE LOGIC) ----------
+    if flags:
+        blood_status = "Critical abnormalities detected"
+        recommendation = (
+            "Extreme or clinically dangerous values detected. "
+            "Please consult a doctor immediately, even if symptoms are mild."
+        )
 
     return {
         "blood_status": blood_status,
