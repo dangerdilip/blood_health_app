@@ -49,7 +49,7 @@ def calculate_risk(cbc_records: list) -> dict:
             "flags": flags + ["ML risk model unavailable"]
         }
 
-        # ---------- RISK INTERPRETATION ----------
+    # ---------- RISK INTERPRETATION ----------
     if risk_score < 0.15:
         future_risk = "Low probability of further deterioration in the next 30–60 days"
     elif risk_score < 0.30:
