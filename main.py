@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # ---------------- FASTAPI APP ----------------
 app = FastAPI(
     title="Blood Health Risk API",
-    version="1.2.0"
+    version="1.2.1"
 )
 
 # ---------------- CORS ----------------
@@ -29,14 +29,13 @@ app.add_middleware(
 
 # ---------------- EXTREME CLINICAL LIMITS ----------------
 EXTREME_LIMITS = {
-    "rbc": (2.0, 8.0),               # million/µL
-    "hematocrit": (15.0, 65.0),      # %
-    "wbc": (1.0, 100.0),             # x10^3/µL
-    "hemoglobin": (6.0, 22.0),       # g/dL
-    "platelets": (20.0, 1000.0),     # x10^3/µL
-    "mcv": (60.0, 120.0),            # fL
-    "mch": (20.0, 40.0),             # pg
-    "mchc": (28.0, 38.0),            # g/dL
+    "rbc": (2.0, 8.0),
+    "wbc": (1.0, 100.0),
+    "hemoglobin": (6.0, 22.0),
+    "platelets": (20.0, 1000.0),
+    "mcv": (60.0, 120.0),
+    "mch": (20.0, 40.0),
+    "mchc": (28.0, 38.0),
 }
 
 # ---------------- SCHEMAS ----------------
@@ -59,10 +58,7 @@ class PatientCBCRequest(BaseModel):
 # ---------------- ROOT ----------------
 @app.get("/")
 def root():
-    return {
-        "status": "ok",
-        "service": "blood-health-backend"
-    }
+    return {"status": "ok", "service": "blood-health-backend"}
 
 
 @app.get("/health")
@@ -80,26 +76,35 @@ def predict_risk(payload: PatientCBCRequest):
 
     alerts = []
 
+    # ✅ Generate alerts FIRST
     for idx, record in enumerate(payload.records):
-        data = record.dict()
+        data = record.model_dump()
 
         for field, value in data.items():
             if field == "date":
                 continue
 
-            if field not in EXTREME_LIMITS:
-                continue
-
-            low, high = EXTREME_LIMITS[field]
-
-            if value < low or value > high:
+            if value < 0:
                 alerts.append(
                     f"Record {idx+1}: {field.upper()} = {value} "
-                    f"is in an extreme clinical range. "
-                    f"Please consult a doctor at the earliest."
+                    f"is invalid (negative values are not allowed)."
                 )
+                continue
 
-    result = calculate_risk(payload.records)
+            if field in EXTREME_LIMITS:
+                low, high = EXTREME_LIMITS[field]
+                if value < low or value > high:
+                    alerts.append(
+                        f"Record {idx+1}: {field.upper()} = {value} "
+                        f"is in an extreme clinical range. "
+                        f"Please consult a doctor at the earliest."
+                    )
+
+    # ✅ PASS alerts into risk engine (THIS FIXES EVERYTHING)
+    result = calculate_risk(
+        payload.records,
+        alerts=alerts
+    )
 
     return {
         "patient_id": payload.patient_id,
