@@ -33,17 +33,32 @@ def calculate_risk(cbc_records: list, alerts: list | None = None) -> dict:
         blood_status = "Clinically stable"
 
     if features is None:
-        return {
-            "blood_status": blood_status,
-            "future_risk": "Insufficient data for trend-based prediction",
-            "recommendation": (
-                "Extreme or clinically dangerous values detected. "
-                "Please consult a doctor immediately."
-                if has_extreme_alerts
-                else "Periodic monitoring advised"
-            ),
-            "flags": flags
-        }
+        if has_extreme_alerts:
+            return {
+                "blood_status": blood_status,
+                "future_risk": "Insufficient data for trend-based prediction",
+                "recommendation": (
+                    "Extreme or clinically dangerous values detected. "
+                    "Please consult a doctor immediately."
+                ),
+                "flags": flags
+            }
+        elif flags:
+            return {
+                "blood_status": blood_status,
+                "future_risk": "Submit 2 or more CBC records (taken on different dates) for trend-based risk prediction",
+                "recommendation": "Some markers are flagged. Add another CBC record for trend analysis.",
+                "flags": flags,
+                "records_needed": 2
+            }
+        else:
+            return {
+                "blood_status": blood_status,
+                "future_risk": "Submit 2 or more CBC records (taken on different dates) for trend-based risk prediction",
+                "recommendation": "Current values appear normal. Add another CBC record for trend analysis.",
+                "flags": flags,
+                "records_needed": 2
+            }
 
     try:
         risk_score = float(predict_risk(features))

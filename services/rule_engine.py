@@ -1,3 +1,6 @@
+# NOTE: This module provides standalone rule-based evaluation.
+# Currently used as reference logic; primary evaluation is in risk_service.py
+
 import pandas as pd
 import numpy as np
 
